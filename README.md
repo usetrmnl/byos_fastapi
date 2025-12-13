@@ -8,23 +8,25 @@ It is loosely based on a Flask implementation by [@ohAnd](https://github.com/ohA
 
 The server maintains device/playlists in SQLite, renders plugin-driven charts/photos into BMP/PNG assets, and exposes `/api/display` plus legacy-compatible endpoints expected by the firmware.
 
+It also tries too hard to do image color grading and dithering to improve the appearance of photos and complex graphics on e-ink panels, which is a rabbit hole I fell into.
+
 ## Non-Goals
 
 - **Full feature parity with the official TRMNL cloud** – this is a lightweight server for personal use, not a 1:1 clone of the official backend.
-- **Advanced security features** – while SSL is supported (but disabled by default to save battery), user authentication, multi-user support, and other advanced features are out of scope.
+- **Advanced security features** – while SSL is supported (but disabled by default to save battery), user authentication, multi-user support, and other advanced features are out of scope. This is intended to be deployed behind a reverse proxy.
 - **Extensive plugin library** – only a few example plugins are provided; users are encouraged to write their own.
-- **Web dashboard for management** – a minimal static UI is included for previewing plugin outputs, but no full-featured admin panel.
+- **Web dashboard for management** – a minimal static UI is included for previewing plugin outputs and doing basic playlist management, but no full-featured admin panel.
 - **Browser-based rendering** – all image generation is done server-side using Python libraries to minimize system requirements.
 
 ## Highlights
 
 - **FastAPI core** – `trmnl_server/main.py` hosts the HTTP API, static assets under `/web`, and middleware-level request logging.
-- **Plugin rendering pipeline** – classes in `plugins/` generate images (BMP for the panel, grayscale PNG previews) using Pillow, httpx, pandas, etc.
+- **Plugin rendering pipeline** – classes in `plugins/` generate images (always 1-bit and 2-bit) using Pillow, httpx, pandas, etc. Just output an image and the server handles (configurable) dithering, grading, and persistence.
 - **Device + playlist persistence** – SQLAlchemy models in `models.py` keep per-device rotation state, playlists, logs, and battery samples in `var/db/trmnl.db`.
 - **Autodiscovered plugin scheduler** – background workers keep assets fresh; see **Plugins & registry** for discovery rules and toggles.
 - **Firmware compatibility** – `/api/display` always returns a single `image_url` plus a changing `filename` token so ESP32-based firmware knows when to refresh.
 - **Batteries-included tooling** – `Makefile` wraps `make serve` (launch FastAPI via `python -m trmnl_server`) and `make test` (pytest). Plugins can be previewed via helper scripts under the repo root.
-- **Color grading + dithering** – "color" grading and multiple dithering algorithms are available to improve image quality on e-ink panels.
+- **Color grading + dithering** – "color" grading and multiple dithering algorithms are available to improve image quality on e-ink panels, and you can force specific playlist entries to use 1-bit BMP output if needed.
 
 ## Deployment
 
@@ -66,7 +68,9 @@ All settings come from environment variables:
 
 Whenever a setting is changed via the `/settings/*` endpoints, the new value is written to SQLite (table `config_entries`). On startup, `config.py` loads environment variables first (highest precedence) and then applies any persisted entries that are not overridden by the environment, so API-driven tweaks survive restarts without fighting `SERVER_PORT=...` overrides in your shell.
 
-Runtime artefacts now consolidate under `var/` inside your chosen working directory:
+Not all settings are exposed in the Web UI (yet); refer to `config.py` for the full list.
+
+Runtime artefacts live under `var/` inside your chosen working directory:
 
 - `var/db/trmnl.db` – SQLite database plus future state.
 - `var/logs/` – reserved for future log sinks.
