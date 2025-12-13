@@ -1,0 +1,15 @@
+.DS_Store
+trmnl_log.json
+db/clientData.txt
+logs/server.log
+ssl/cert.pem
+config.yaml
+ssl/key.pem
+db/clientLog.txt
+trmnl.db
+venv/*
+__pycache__/*
+web/*.bmp
+web/*.png
+*.pyc
+var/

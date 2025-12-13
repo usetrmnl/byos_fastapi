@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  trmnl-server:
+    container_name: trmnl-server
+    runtime: python
+    ports:
+      - "4567:4567"
+    environment:
+      # Override as needed (examples):
+      SERVER_PORT: "4567"
+      ENABLE_SSL: false
+      PYTHONIOENCODING: "UTF_8:replace"
+      PYTHONUNBUFFERED: 1
+      PYTHONPATH: "/app"
+      LANG: "en_US.UTF-8"
+      LC_ALL: "en_US.UTF-8"
+      TZ: "Europe/Lisbon"
+      # CALIBRATION_PLUGIN_ENABLED: "true"
+      # PHOTO_GRADING_ENABLED: "true"
+      # ASSETS_ROOT: "web"
+      # STATIC_ROOT: "web"
+      # GENERATED_ROOT: "var/generated"
+    command: python3 -u -m trmnl_server
+    restart: unless-stopped

@@ -1,0 +1,1 @@
+Not found: /chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.umd.js

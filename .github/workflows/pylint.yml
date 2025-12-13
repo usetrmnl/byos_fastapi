@@ -1,0 +1,33 @@
+name: Pylint
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pylint astroid
+        pip install -r requirements.txt
+    - name: Analysing the code with pylint
+      run: |
+        pylint_output=$(pylint $(git ls-files '*.py') --output-format=parseable | tee pylint.log)
+        echo "$pylint_output"
+        SCORE=$(echo "$pylint_output" | awk -F ' ' '/Your code has been rated at/ {print $7}' | cut -d'/' -f1)
+        if (( $(echo "$SCORE >= 9.0" | bc -l) )); then
+          echo "Pylint score ($SCORE) is acceptable."
+          exit 0
+        else
+          echo "Pylint score ($SCORE) is too low."
+          exit 1
+        fi
