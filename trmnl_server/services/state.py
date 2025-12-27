@@ -187,7 +187,8 @@ global_state: Dict[str, Any] = {
         'hashes': [],
         'meta': [],
         'selected_ids': [],
-        'version': 0
+        'version': 0,
+        'has_persistent_playlist': False
     },
     'devices': {},
     'device_playlists': {},
@@ -413,6 +414,7 @@ def initialize_rotation_playlists_from_storage() -> None:
         with STATE_LOCK:
             master = rotation_master()
             master['selected_ids'] = default_playlist
+            master['has_persistent_playlist'] = True
     for device_id, selected_ids in models.list_device_playlists():
         cache_device_playlist(device_id, selected_ids)
 
@@ -688,6 +690,7 @@ def set_default_playlist(playlist_ids: List[str]) -> None:
     with STATE_LOCK:
         master = rotation_master()
         master['selected_ids'] = playlist_ids
+        master['has_persistent_playlist'] = False  # Reset flag when user explicitly sets playlist
         master['version'] += 1
         selection_snapshot = list(master['selected_ids'])
     persist_default_playlist(selection_snapshot)
@@ -916,7 +919,9 @@ def set_primary_rotation_assets(
         if not had_entries:
             master['version'] += 1
 
-        if (not master.get('selected_ids')) or auto_fill_enabled:
+        # Only auto-fill if there's no existing playlist AND no persistent playlist was loaded
+        # This prevents overwriting user-defined playlists during plugin refresh
+        if not master.get('selected_ids') and not master.get('has_persistent_playlist'):
             master['selected_ids'] = [entry.get('id') for entry in meta_list if entry.get('id')]
             selection_snapshot = list(master['selected_ids'])
 
@@ -991,7 +996,9 @@ def append_rotation_assets(
                 )
             )
             master['version'] += 1
-            if (not master.get('selected_ids')) or auto_fill_enabled:
+            # Only auto-fill if there's no existing playlist AND no persistent playlist was loaded
+            # This prevents overwriting user-defined playlists during plugin refresh
+            if not master.get('selected_ids') and not master.get('has_persistent_playlist'):
                 master['selected_ids'] = [entry.get('id') for entry in meta_list if entry.get('id')]
                 selection_snapshot = list(master['selected_ids'])
 

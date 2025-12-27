@@ -442,3 +442,76 @@ def test_preview_sequence_stores_each_frame():
             assert resp_preview.content == expected_bytes
     finally:
         _reset_device_context(device_id)
+
+
+def test_playlist_persistence_across_plugin_refresh():
+    """Test that user-defined playlists are preserved during plugin refresh."""
+    # Setup initial state with a user-defined playlist
+    master = _prime_rotation_master()
+    device_id = 'test-persistence'
+    _reset_device_context(device_id)
+    
+    # Set a user-defined playlist (only hashB, not all entries)  
+    user_playlist = ['hashB']
+    
+    # Save to database to simulate existing persistent state
+    state.persist_default_playlist(user_playlist)
+    
+    # Reset rotation master to initial state to simulate fresh server start
+    _prime_rotation_master()
+    # Clear selected_ids and has_persistent_playlist to simulate fresh start  
+    state.rotation_master()['selected_ids'] = []
+    state.rotation_master()['has_persistent_playlist'] = False
+    
+    # Initialize playlists from storage (this should set has_persistent_playlist flag)
+    state.initialize_rotation_playlists_from_storage()
+    
+    # Verify the playlist was loaded and flag was set
+    assert master['selected_ids'] == user_playlist
+    assert master.get('has_persistent_playlist') == True
+    
+    # Simulate what happens when set_primary_rotation_assets is called during plugin refresh
+    from trmnl_server.plugins.base import PluginOutput
+    from trmnl_server.services import state as state_module
+    from trmnl_server import utils
+    from io import BytesIO
+    
+    # Create mock plugin assets
+    dummy_path = utils.asset_path('img', 'dummy.bmp')
+    with open(dummy_path, 'rb') as handle:
+        bmp_bytes = handle.read()
+    png_bytes = utils.convert_bmp_bytes_to_png(BytesIO(bmp_bytes)).getvalue()
+    
+    # Write temp files for the assets
+    import tempfile
+    import os
+    
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        bmp_path = os.path.join(tmp_dir, 'test.bmp')
+        png_path = os.path.join(tmp_dir, 'test.png')
+        
+        with open(bmp_path, 'wb') as f:
+            f.write(bmp_bytes)
+        with open(png_path, 'wb') as f:
+            f.write(png_bytes)
+        
+        assets = PluginOutput(
+            monochrome_path=bmp_path,
+            grayscale_path=png_path
+        )
+        
+        try:
+            # This should NOT overwrite the user playlist since it already exists and has_persistent_playlist flag is set
+            state_module.set_primary_rotation_assets('TestPlugin', assets)
+            
+            # Verify the user playlist is preserved
+            assert master['selected_ids'] == user_playlist, f"Expected {user_playlist}, got {master['selected_ids']}"
+            assert len(master['meta']) > 0, "Meta entries should be populated"
+            
+            # Verify the playlist wasn't auto-filled with all available entries
+            available_ids = [entry.get('id') for entry in master['meta'] if entry.get('id')]
+            assert len(available_ids) > len(user_playlist), "Should have multiple available entries"
+            assert master['selected_ids'] != available_ids, "Should not auto-fill with all available entries"
+            
+        finally:
+            _reset_device_context(device_id)
